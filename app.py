@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 import bcrypt
 
 from forms import UserAddForm, LoginForm, MessageForm, UserEditForm
-from models import db, connect_db, User, Message
+from models import db, connect_db, User, Message, Likes
 
 CURR_USER_KEY = "curr_user"
 
@@ -158,7 +158,8 @@ def users_show(user_id):
                 .order_by(Message.timestamp.desc())
                 .limit(100)
                 .all())
-    return render_template('users/show.html', user=user, messages=messages)
+    likes = [message.id for message in user.likes]
+    return render_template('users/show.html', user=user, messages=messages, likes=likes)
 
 
 @app.route('/users/<int:user_id>/following')
@@ -319,17 +320,44 @@ def homepage():
     """
 
     if g.user:
-        messages = Message.query.all()
-        # messages = (Message
-        #             .query
-        #             .order_by(Message.timestamp.desc())
-        #             .limit(100)
-        #             .all())
+        following = [f.id for f in g.user.following] + [g.user.id]
+        messages = (Message
+                    .query
+                    .filter(Message.user_id.in_(following))
+                    .order_by(Message.timestamp.desc())
+                    .limit(100)
+                    .all())
 
         return render_template('home.html', messages=messages)
 
     else:
         return render_template('home-anon.html')
+    
+@app.route('/users/add_like/<int:msg_id>', methods=['POST'])
+def add_like(msg_id):
+    total_likes = Likes.query.filter(Likes.user_id==g.user.id).count()
+    if g.user:
+
+        if Likes.query.filter(Likes.user_id==g.user.id, Likes.message_id==msg_id).first():
+            Likes.query.filter(Likes.user_id==g.user.id, Likes.message_id==msg_id).delete()
+            db.session.commit()
+        else:
+            like = Likes(user_id=g.user.id, message_id=msg_id)
+            db.session.add(like)
+            db.session.commit()
+
+    return redirect('/')
+
+@app.route('/users/<int:user_id>/likes')
+def user_likes(user_id):
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    user = User.query.get_or_404(user_id)
+
+    return render_template('/users/likes.html', user=user, likes=user.likes)
 
 
 ##############################################################################
