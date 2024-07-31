@@ -2,9 +2,10 @@ import os
 
 from flask import Flask, render_template, request, flash, redirect, session, g
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import and_
 
 from forms import UserAddForm, LoginForm, MessageForm, UserEditForm
-from models import db, connect_db, User, Message
+from models import db, connect_db, User, Message, Follows, Likes
 
 CURR_USER_KEY = "curr_user"
 
@@ -221,19 +222,23 @@ def profile():
         return redirect('/')
     
     form = UserEditForm()
-
-    if form.validate_on_submit() and form.password.data == 'r':
+    
+    
+    if form.validate_on_submit() and User.authenticate(g.user.username, form.password.data):
+        
         if form.username.data != "": g.user.username = form.username.data
         if form.email.data != "": g.user.email = form.email.data
         if form.image_url.data != "": g.user.image_url = form.image_url.data
         if form.header_image_url.data != "": g.user.header_image_url = form.header_image_url.data
         if form.bio.data != "": g.user.bio = form.bio.data
+        if form.location.data != "": g.user.location = form.location.data
         db.session.commit()
         
-        return redirect('/')
+        return redirect(f"/users/{g.user.id}")
+    
+    elif form.validate_on_submit(): flash("incorrect password", "danger")
 
     return render_template('/users/edit.html', user=g.user, form=form)
-    # IMPLEMENT THIS
 
 
 @app.route('/users/delete', methods=["POST"])
@@ -261,6 +266,7 @@ def messages_add():
 
     Show form if GET. If valid, update message and redirect to user page.
     """
+    
 
     if not g.user:
         flash("Access unauthorized.", "danger")
@@ -300,6 +306,20 @@ def messages_destroy(message_id):
 
     return redirect(f"/users/{g.user.id}")
 
+@app.route('/users/add_like/<int:message_id>', methods=["GET", "POST"])
+def addLike(message_id):
+    """Add a like to a message"""
+
+    if not g.user:
+        flash("Please login", "danger")
+        return redirect("/")
+    
+    User.likeMessage(g.user.id , message_id)
+    
+    
+    return redirect('/')
+
+
 
 ##############################################################################
 # Homepage and error pages
@@ -314,11 +334,12 @@ def homepage():
     """
 
     if g.user:
-        messages = (Message
-                    .query
-                    .order_by(Message.timestamp.desc())
-                    .limit(100)
-                    .all())
+        messages = (Message.query
+                .join(Follows, (Follows.user_being_followed_id == Message.user_id) | (Follows.user_following_id == Message.user_id))
+                .filter((Follows.user_following_id == g.user.id))
+                .order_by(Message.timestamp.desc())
+                .limit(100)
+                .all())
 
         return render_template('home.html', messages=messages)
 

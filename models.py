@@ -168,6 +168,28 @@ class User(db.Model):
                 return user
 
         return False
+    
+    @classmethod
+    def likeMessage(cls, user_id, message_id):
+
+        checkLikeMessage = Likes.query.filter_by(user_id=user_id, message_id=message_id).first()
+
+        if checkLikeMessage:
+            
+
+            db.session.delete(checkLikeMessage)
+            db.session.commit()
+            return 
+        
+        else:
+            message = Likes(
+                user_id=user_id,
+                message_id=message_id
+            )
+
+            db.session.add(message)
+            db.session.commit()
+            return message
 
 
 class Message(db.Model):
