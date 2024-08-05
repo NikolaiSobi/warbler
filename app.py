@@ -314,14 +314,38 @@ def addLike(message_id):
         flash("Please login", "danger")
         return redirect("/")
     
+    for message in g.user.messages:
+        if message.id == message_id:
+            flash("Sorry can't like your own Warble", "danger")
+            return redirect('/')
+    
 
     User.likeMessage(g.user.id , message_id)
     
     
     return redirect('/')
 
+@app.route('/users/un_like_likes_page/<int:message_id>', methods=["GET", "POST"])
+def unLikeOnLikePage(message_id):
+    """Unlike a message on the likes page"""
+
+    if not g.user:
+        flash("Please login", "danger")
+        return redirect("/")
+    
+    for message in g.user.messages:
+        if message.id == message_id:
+            flash("Sorry can't like your own Warble", "danger")
+            return redirect("/")
+    
+
+    User.likeMessage(g.user.id , message_id)
+    
+    
+    return redirect(f"/users/{g.user.id}/likes")
+
 @app.route('/users/<int:user_id>/likes', methods=['GET'])
-def showLikes():
+def showLikes(user_id):
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
