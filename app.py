@@ -2,7 +2,7 @@ import os
 
 from flask import Flask, render_template, request, flash, redirect, session, g
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 
 from forms import UserAddForm, LoginForm, MessageForm, UserEditForm
 from models import db, connect_db, User, Message, Follows, Likes
@@ -139,7 +139,8 @@ def list_users():
     if not search:
         users = User.query.all()
     else:
-        users = User.query.filter(User.username.like(f"%{search}%")).all()
+        search = search.lower()
+        users = User.query.filter(func.lower(User.username).like(f"%{search}%")).all()
 
     return render_template('users/index.html', users=users)
 
@@ -267,7 +268,6 @@ def messages_add():
     Show form if GET. If valid, update message and redirect to user page.
     """
     
-
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
@@ -314,10 +314,21 @@ def addLike(message_id):
         flash("Please login", "danger")
         return redirect("/")
     
+
     User.likeMessage(g.user.id , message_id)
     
     
     return redirect('/')
+
+@app.route('/users/<int:user_id>/likes', methods=['GET'])
+def showLikes():
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+        
+    likes = g.user.likes
+   
+    return render_template('users/likes.html', likes=likes, user=g.user)
 
 
 
@@ -325,7 +336,7 @@ def addLike(message_id):
 # Homepage and error pages
 
 
-@app.route('/')
+@app.route('/', methods=["GET", "POST"])
 def homepage():
     """Show homepage:
 
